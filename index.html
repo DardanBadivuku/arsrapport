@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Årsrapportgenerator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --ink:#1a1a18;--paper:#faf9f7;--cream:#f0ede6;
+    --teal:#0d7c6b;--teal-light:#e0f5f1;--teal-dark:#095c4f;
+    --amber:#c47b1a;--amber-light:#fef4e4;
+    --red:#c0392b;--red-light:#fdf0ef;
+    --border:#ddd9cf;--muted:#7a776e;
+    --r:10px;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;line-height:1.6}
+
+  /* HEADER */
+  header{background:var(--ink);padding:28px 40px;display:flex;align-items:center;gap:16px}
+  header .logo{width:40px;height:40px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  header .logo svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  header h1{font-family:'DM Serif Display',serif;font-size:22px;color:#fff;font-weight:400}
+  header p{font-size:13px;color:#9a9890;margin-top:2px}
+
+  /* LAYOUT */
+  main{max-width:820px;margin:0 auto;padding:40px 20px 80px}
+
+  /* STEPS */
+  .step{margin-bottom:32px}
+  .step-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .step-num{width:32px;height:32px;border-radius:50%;background:var(--teal);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .step-title{font-size:18px;font-weight:500}
+  .step-sub{font-size:13px;color:var(--muted);margin-top:1px}
+
+  /* CARD */
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+
+  /* DROP ZONES */
+  .drop-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:600px){.drop-grid{grid-template-columns:1fr}}
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--r);padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;position:relative}
+  .drop-zone:hover,.drop-zone.over{border-color:var(--teal);background:var(--teal-light)}
+  .drop-zone.done{border-color:var(--teal);border-style:solid;background:var(--teal-light)}
+  .drop-zone.error{border-color:var(--red);background:var(--red-light)}
+  .drop-icon{width:40px;height:40px;margin:0 auto 10px;opacity:.4}
+  .drop-type{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .drop-label{font-size:14px;color:var(--ink);margin-bottom:4px}
+  .drop-hint{font-size:12px;color:var(--muted)}
+  .drop-filename{font-size:13px;color:var(--teal-dark);font-weight:500;word-break:break-all}
+  .drop-check{font-size:20px;margin-bottom:6px}
+  input[type=file]{display:none}
+
+  /* YEAR ROW */
+  .year-row{display:flex;align-items:center;gap:16px;padding:18px 20px;background:#fff;border:1px solid var(--border);border-radius:var(--r);flex-wrap:wrap}
+  .year-row label{font-size:14px;color:var(--muted);font-weight:500}
+  .year-input{width:82px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;font-weight:500;color:var(--ink);background:#fff;transition:border .2s}
+  .year-input:focus{outline:none;border-color:var(--teal)}
+  .year-arrow{font-size:18px;color:var(--muted)}
+
+  /* PREVIEW */
+  .preview-box{background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;display:none}
+  .preview-box.show{display:block}
+  .preview-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .preview-title{font-size:14px;font-weight:600}
+  .preview-count{font-size:12px;color:var(--muted)}
+  .preview-table{width:100%;border-collapse:collapse;font-size:13px}
+  .preview-table th{background:var(--cream);padding:8px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+  .preview-table td{padding:9px 14px;border-bottom:1px solid #f0ede6;color:var(--ink)}
+  .preview-table tr:last-child td{border-bottom:none}
+  .preview-table tr:hover td{background:var(--cream)}
+
+  /* GENERATE BUTTON */
+  .gen-btn{width:100%;padding:16px;background:var(--teal);color:#fff;border:none;border-radius:var(--r);font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px}
+  .gen-btn:hover:not(:disabled){background:var(--teal-dark);transform:translateY(-1px)}
+  .gen-btn:disabled{background:#9ca3af;cursor:not-allowed;transform:none}
+  .gen-btn svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+  /* PROGRESS */
+  .progress-wrap{display:none;margin-top:16px}
+  .progress-wrap.show{display:block}
+  .progress-bar-bg{height:8px;background:var(--cream);border-radius:99px;overflow:hidden;margin-bottom:10px}
+  .progress-bar-fill{height:100%;background:var(--teal);border-radius:99px;width:0%;transition:width .3s}
+  .progress-text{font-size:13px;color:var(--muted);text-align:center}
+
+  /* ALERT */
+  .alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-top:14px;display:none}
+  .alert.show{display:block}
+  .alert.err{background:var(--red-light);color:var(--red);border:1px solid #f5b0ac}
+  .alert.ok{background:var(--teal-light);color:var(--teal-dark);border:1px solid #9fe1cb}
+
+  /* HOW IT WORKS */
+  .how{background:var(--cream);border-radius:var(--r);padding:24px;margin-top:40px}
+  .how h3{font-size:15px;font-weight:600;margin-bottom:16px;color:var(--ink)}
+  .how-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}
+  .how-step{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
+  .how-step .icon{width:44px;height:44px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+  .how-step .icon svg{width:22px;height:22px;stroke:var(--teal);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .how-step p{font-size:12px;color:var(--muted);line-height:1.4}
+  .how-step strong{font-size:13px;color:var(--ink)}
+
+  /* SPINNER */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{animation:spin .8s linear infinite;display:inline-block}
+
+  /* DIVIDER */
+  .divider{border:none;border-top:1px solid var(--border);margin:8px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+  </div>
+  <div>
+    <h1>Årsrapportgenerator</h1>
+    <p>Last opp Excel og Word-mal — få én PDF per kunde</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">Last opp filer</div>
+        <div class="step-sub">Dra og slipp, eller klikk for å velge</div>
+      </div>
+    </div>
+    <div class="drop-grid">
+
+      <!-- WORD -->
+      <div class="drop-zone" id="dz-word" onclick="document.getElementById('fi-word').click()"
+           ondragover="dzOver(event,'dz-word',true)"
+           ondragleave="dzOver(event,'dz-word',false)"
+           ondrop="dzDrop(event,'fi-word','dz-word','word-name')">
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" style="width:40px;height:40px" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
+          </svg>
+        </div>
+        <div class="drop-type">Word-mal</div>
+        <div class="drop-label" id="word-name">Slipp .docx-filen her</div>
+        <div class="drop-hint">eller klikk for å velge</div>
+        <input type="file" id="fi-word" accept=".docx" onchange="fileChosen(this,'dz-word','word-name')">
+      </div>
+
+      <!-- EXCEL -->
+      <div class="drop-zone" id="dz-excel" onclick="document.getElementById('fi-excel').click()"
+           ondragover="dzOver(event,'dz-excel',true)"
+           ondragleave="dzOver(event,'dz-excel',false)"
+           ondrop="dzDrop(event,'fi-excel','dz-excel','excel-name')">
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" style="width:40px;height:40px" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linecap="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+        </div>
+        <div class="drop-type">Excel-kundeliste</div>
+        <div class="drop-label" id="excel-name">Slipp .xlsx-filen her</div>
+        <div class="drop-hint">eller klikk for å velge</div>
+        <input type="file" id="fi-excel" accept=".xlsx,.xls"
+               onchange="fileChosen(this,'dz-excel','excel-name'); loadPreview()">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-title">Velg årstall</div>
+        <div class="step-sub">Alle forekomster av det gamle årstallet oppdateres</div>
+      </div>
+    </div>
+    <div class="year-row">
+      <label>Oppdater fra:</label>
+      <input class="year-input" id="yr-from" type="text" value="2024" maxlength="4">
+      <span class="year-arrow">→</span>
+      <label>til:</label>
+      <input class="year-input" id="yr-to" type="text" value="2026" maxlength="4">
+      <span style="font-size:13px;color:var(--muted);margin-left:auto">
+        Tittel, brødtekst og topptekst oppdateres
+      </span>
+    </div>
+  </div>
+
+  <!-- STEP 3: PREVIEW -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">Forhåndsvisning av kunder</div>
+        <div class="step-sub">Laster automatisk når du velger Excel-filen</div>
+      </div>
+    </div>
+    <div class="preview-box" id="preview-box">
+      <div class="preview-header">
+        <span class="preview-title">Kunder fra Excel</span>
+        <span class="preview-count" id="preview-count"></span>
+      </div>
+      <table class="preview-table">
+        <thead><tr><th>Firmanavn</th><th>Kontaktperson</th></tr></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- STEP 4: GENERATE -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-title">Generer og last ned</div>
+        <div class="step-sub">Alle PDF-ene pakkes i én ZIP-fil</div>
+      </div>
+    </div>
+
+    <button class="gen-btn" id="gen-btn" onclick="generate()">
+      <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Generer alle PDF-rapporter
+    </button>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill"></div></div>
+      <div class="progress-text" id="prog-text">Starter…</div>
+    </div>
+
+    <div class="alert err" id="alert-err"></div>
+    <div class="alert ok"  id="alert-ok"></div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how">
+    <h3>Slik fungerer det</h3>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <strong>Last opp</strong>
+        <p>Word-malen din og Excel-listen med kunder</p>
+      </div>
+      <div class="how-step">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <strong>Systemet leser</strong>
+        <p>Navn, adresse, postnr, poststed og kontaktperson fra Excel</p>
+      </div>
+      <div class="how-step">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <strong>Fyller inn</strong>
+        <p>Kundedata og oppdaterer årstall i alle Word-feltene</p>
+      </div>
+      <div class="how-step">
+        <div class="icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <strong>Last ned ZIP</strong>
+        <p>Én PDF per kunde med korrekt filnavn</p>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:32px">
+    Filene behandles lokalt på serveren og slettes umiddelbart etter generering.
+  </p>
+
+</main>
+
+<script>
+// --- Drag & Drop ---
+function dzOver(e, id, on) {
+  e.preventDefault();
+  document.getElementById(id).classList.toggle('over', on);
+}
+function dzDrop(e, inputId, dzId, nameId) {
+  e.preventDefault();
+  document.getElementById(dzId).classList.remove('over');
+  const files = e.dataTransfer.files;
+  if (files.length) {
+    const inp = document.getElementById(inputId);
+    const dt = new DataTransfer();
+    dt.items.add(files[0]);
+    inp.files = dt.files;
+    fileChosen(inp, dzId, nameId);
+    if (inputId === 'fi-excel') loadPreview();
+  }
+}
+function fileChosen(inp, dzId, nameId) {
+  const dz = document.getElementById(dzId);
+  const nm = document.getElementById(nameId);
+  if (inp.files.length) {
+    dz.classList.add('done');
+    dz.classList.remove('error');
+    nm.innerHTML = `<div class="drop-check">✓</div><div class="drop-filename">${inp.files[0].name}</div>`;
+  }
+}
+
+// --- Preview ---
+async function loadPreview() {
+  const fi = document.getElementById('fi-excel');
+  if (!fi.files.length) return;
+  const fd = new FormData();
+  fd.append('excel', fi.files[0]);
+  try {
+    const res = await fetch('/preview', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) return;
+    const box = document.getElementById('preview-box');
+    const body = document.getElementById('preview-body');
+    const count = document.getElementById('preview-count');
+    body.innerHTML = '';
+    data.kunder.forEach(k => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${k.navn}</td><td style="color:var(--muted)">${k.kontakt || '—'}</td>`;
+      body.appendChild(tr);
+    });
+    if (data.totalt > 8) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="2" style="color:var(--muted);font-style:italic">… og ${data.totalt - 8} til</td>`;
+      body.appendChild(tr);
+    }
+    count.textContent = `${data.totalt} kunder totalt`;
+    box.classList.add('show');
+  } catch(e) {}
+}
+
+// --- Generate ---
+async function generate() {
+  const fiWord  = document.getElementById('fi-word');
+  const fiExcel = document.getElementById('fi-excel');
+  const alertErr = document.getElementById('alert-err');
+  const alertOk  = document.getElementById('alert-ok');
+  const progWrap = document.getElementById('progress-wrap');
+  const progFill = document.getElementById('prog-fill');
+  const progText = document.getElementById('prog-text');
+  const btn      = document.getElementById('gen-btn');
+
+  alertErr.classList.remove('show');
+  alertOk.classList.remove('show');
+
+  if (!fiWord.files.length || !fiExcel.files.length) {
+    alertErr.textContent = 'Last opp både Word-mal og Excel-fil først.';
+    alertErr.classList.add('show');
+    return;
+  }
+
+  const yrFrom = document.getElementById('yr-from').value.trim();
+  const yrTo   = document.getElementById('yr-to').value.trim();
+  if (!yrFrom || !yrTo) {
+    alertErr.textContent = 'Fyll inn årstall.';
+    alertErr.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin">⟳</span> Genererer PDF-er… (dette tar litt tid)`;
+  progWrap.classList.add('show');
+  progFill.style.width = '0%';
+
+  // Animert progresjon mens vi venter
+  let fakeProgress = 0;
+  const ticker = setInterval(() => {
+    fakeProgress = Math.min(fakeProgress + 0.5, 90);
+    progFill.style.width = fakeProgress + '%';
+    progText.textContent = fakeProgress < 30 ? 'Leser filer og forbereder…'
+      : fakeProgress < 60 ? 'Genererer PDF-er per kunde…'
+      : 'Pakker ZIP-fil…';
+  }, 300);
+
+  const fd = new FormData();
+  fd.append('word', fiWord.files[0]);
+  fd.append('excel', fiExcel.files[0]);
+  fd.append('year_from', yrFrom);
+  fd.append('year_to', yrTo);
+
+  try {
+    const res = await fetch('/generate', {method:'POST', body:fd});
+    clearInterval(ticker);
+
+    if (!res.ok) {
+      const data = await res.json().catch(()=>({error:'Ukjent feil'}));
+      throw new Error(data.error || 'Serverfeil');
+    }
+
+    // Hent filnavn fra header
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)/i);
+    const filename = match ? decodeURIComponent(match[1]) : `Årsrapporter_${yrTo}.zip`;
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+
+    progFill.style.width = '100%';
+    progText.textContent = 'Ferdig!';
+    alertOk.textContent = `✓ ZIP-filen "${filename}" er lastet ned til din nedlastingsmappe.`;
+    alertOk.classList.add('show');
+
+  } catch(e) {
+    clearInterval(ticker);
+    alertErr.textContent = `Feil: ${e.message}`;
+    alertErr.classList.add('show');
+    progWrap.classList.remove('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generer alle PDF-rapporter`;
+}
+</script>
+</body>
+</html>
