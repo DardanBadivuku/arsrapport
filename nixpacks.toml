@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "libreoffice", "fontconfig"]
+nixPkgs = ["python311", "libreoffice", "fontconfig"]
 
 [phases.install]
-cmds = ["python3.11 -m pip install --break-system-packages -r requirements.txt"]
+cmds = [
+  "python3.11 -m ensurepip --upgrade",
+  "python3.11 -m pip install --break-system-packages -r requirements.txt"
+]
 
 [start]
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1"
