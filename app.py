@@ -52,16 +52,37 @@ def update_doc(doc, navn, adresse, postnr, poststed, kontakt, yf, yt):
                 for p in cell.paragraphs:
                     if yf in p.text: replace_para(p, yf, yt)
 
+def format_postnr(val):
+    """Sørger for at postnummer alltid har 4 siffer med ledende null."""
+    s = str(val).strip()
+    # Fjern .0 fra Excel-tall (f.eks. "235.0" → "235")
+    if '.' in s:
+        s = s.split('.')[0]
+    s = s.strip()
+    if not s or s == 'nan':
+        return ''
+    # Behold kun siffer
+    digits = ''.join(c for c in s if c.isdigit())
+    if not digits:
+        return s  # Returner originalen hvis ingen siffer
+    # Fyll på med ledende nuller til 4 siffer
+    return digits.zfill(4)
+
+def clean(val):
+    s = str(val).strip()
+    return '' if s in ('nan', 'None', '<NA>') else s
+
 @app.route('/preview', methods=['POST'])
 def preview():
     try:
         excel_file = request.files.get('excel')
         if not excel_file:
             return jsonify({'error': 'Ingen fil'}), 400
-        df = pd.read_excel(excel_file, sheet_name=0)
+        df = pd.read_excel(excel_file, sheet_name=0, dtype=str)
         df.columns = [str(c).strip() for c in df.columns]
         navn_col    = find_col(df, ['Navn','Name'])
         kontakt_col = find_col(df, ['Kontaktperson','Kontakt','Contact'])
+        postnr_col  = find_col(df, ['Postnr','Postkode','Zip'])
         if not navn_col:
             return jsonify({'error': 'Finner ikke kolonnen "Navn" i Excel-filen'}), 400
         df = df.dropna(subset=[navn_col])
@@ -69,8 +90,13 @@ def preview():
         for _, row in df.head(10).iterrows():
             navn = str(row.get(navn_col,'')).strip()
             k    = str(row.get(kontakt_col,'')).strip() if kontakt_col else ''
+            pnr  = format_postnr(row.get(postnr_col,'')) if postnr_col else ''
             if navn and navn != 'nan':
-                kunder.append({'navn': navn, 'kontakt': '' if k == 'nan' else k})
+                kunder.append({
+                    'navn': navn,
+                    'kontakt': '' if k == 'nan' else k,
+                    'postnr': pnr
+                })
         return jsonify({'kunder': kunder, 'totalt': len(df)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -86,14 +112,15 @@ def generate():
         if not word_file or not excel_file:
             return jsonify({'error': 'Mangler filer'}), 400
 
-        df = pd.read_excel(excel_file, sheet_name=0)
+        # dtype=str sikrer at alle kolonner leses som tekst — ingen tall-konvertering
+        df = pd.read_excel(excel_file, sheet_name=0, dtype=str)
         df.columns = [str(c).strip() for c in df.columns]
 
-        navn_col    = find_col(df, ['Navn','Name'])
-        adr_col     = find_col(df, ['Adresse','Address'])
-        postnr_col  = find_col(df, ['Postnr','Postkode','Zip'])
-        poststed_col= find_col(df, ['Poststed','Sted','City'])
-        kontakt_col = find_col(df, ['Kontaktperson','Kontakt','Contact'])
+        navn_col     = find_col(df, ['Navn','Name'])
+        adr_col      = find_col(df, ['Adresse','Address'])
+        postnr_col   = find_col(df, ['Postnr','Postkode','Zip'])
+        poststed_col = find_col(df, ['Poststed','Sted','City'])
+        kontakt_col  = find_col(df, ['Kontaktperson','Kontakt','Contact'])
 
         if not navn_col:
             return jsonify({'error': 'Finner ikke kolonnen "Navn" i Excel-filen'}), 400
@@ -101,21 +128,16 @@ def generate():
         df = df.dropna(subset=[navn_col])
         word_bytes = word_file.read()
 
-        def clean(val):
-            s = str(val).strip()
-            return '' if s in ('nan','None','<NA>') else s
-
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             for _, row in df.iterrows():
                 navn = clean(row.get(navn_col, ''))
                 if not navn: continue
 
-                adresse  = clean(row.get(adr_col,''))     if adr_col else ''
-                raw_pnr  = clean(row.get(postnr_col,''))  if postnr_col else ''
-                postnr   = raw_pnr.split('.')[0] if raw_pnr else ''
-                poststed = clean(row.get(poststed_col,'')) if poststed_col else ''
-                kontakt  = clean(row.get(kontakt_col,''))  if kontakt_col else ''
+                adresse  = clean(row.get(adr_col,''))          if adr_col else ''
+                postnr   = format_postnr(row.get(postnr_col,'')) if postnr_col else ''
+                poststed = clean(row.get(poststed_col,''))      if poststed_col else ''
+                kontakt  = clean(row.get(kontakt_col,''))       if kontakt_col else ''
 
                 try:
                     doc = Document(io.BytesIO(word_bytes))
@@ -138,7 +160,8 @@ def generate():
 
                     shutil.rmtree(tmp, ignore_errors=True)
                 except Exception:
-                    shutil.rmtree(tmp, ignore_errors=True) if 'tmp' in dir() else None
+                    try: shutil.rmtree(tmp, ignore_errors=True)
+                    except: pass
 
         zip_buf.seek(0)
         return send_file(
